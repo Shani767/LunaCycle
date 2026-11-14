@@ -82,6 +82,11 @@ export async function saveLog({ date, flow, mood, symptoms, note }) {
   );
 }
 
+export async function deleteLog(date) {
+  const db = await getDb();
+  await db.runAsync('DELETE FROM logs WHERE date = ?', [date]);
+}
+
 /* ---------- Settings ---------- */
 
 export async function getSettings() {
