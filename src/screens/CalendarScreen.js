@@ -1,9 +1,9 @@
 import { useCallback, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, Alert, StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '../theme';
 import { Card, Button } from '../components/UI';
-import { getPeriods, getSettings, getAllLogs } from '../database/db';
+import { getPeriods, getSettings, getAllLogs, deleteLog } from '../database/db';
 import { getStats, predictNextStart } from '../utils/cycle';
 import { today, addDays, pad, formatDate, MONTH_NAMES } from '../utils/dates';
 
@@ -36,7 +36,12 @@ export default function CalendarScreen({ navigation }) {
   // days that belong to a logged period
   const periodDays = new Set();
   periods.forEach((p) => {
-    const end = p.end_date || addDays(p.start_date, stats.avgPeriod - 1);
+    let end = p.end_date;
+    if (!end) {
+      // Period not ended yet: keep marking days until the user taps "Period ended"
+      const expectedEnd = addDays(p.start_date, stats.avgPeriod - 1);
+      end = expectedEnd > today() ? expectedEnd : today();
+    }
     for (let d = p.start_date; d <= end; d = addDays(d, 1)) periodDays.add(d);
   });
 
@@ -71,6 +76,25 @@ export default function CalendarScreen({ navigation }) {
   for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
 
   const log = logs[selected];
+
+  const handleDeleteLog = () => {
+    Alert.alert('Delete this log?', `Your log for ${formatDate(selected)} will be removed.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteLog(selected);
+          // remove it from the screen straight away
+          setLogs((prev) => {
+            const copy = { ...prev };
+            delete copy[selected];
+            return copy;
+          });
+        },
+      },
+    ]);
+  };
   const selectedStatus = periodDays.has(selected)
     ? 'Period day'
     : predictedDays.has(selected)
@@ -156,6 +180,7 @@ export default function CalendarScreen({ navigation }) {
           variant="outline"
           onPress={() => navigation.navigate('Log', { date: selected, ts: Date.now() })}
         />
+        {log && <Button title="Delete log" variant="danger" onPress={handleDeleteLog} />}
       </Card>
     </ScrollView>
   );
