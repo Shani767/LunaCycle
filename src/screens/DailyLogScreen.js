@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { colors } from '../theme';
 import { Card, Chip, Button, SectionTitle } from '../components/UI';
-import { getLog, saveLog } from '../database/db';
+import { getLog, saveLog, deleteLog } from '../database/db';
 import { today, addDays, formatDate } from '../utils/dates';
 
 const FLOWS = ['None', 'Light', 'Medium', 'Heavy'];
@@ -27,6 +27,7 @@ export default function DailyLogScreen({ route }) {
   const [moods, setMoods] = useState([]);
   const [symptoms, setSymptoms] = useState([]);
   const [note, setNote] = useState('');
+  const [hasLog, setHasLog] = useState(false);
 
   // open a specific day when we arrive from the Calendar
   useEffect(() => {
@@ -40,6 +41,7 @@ export default function DailyLogScreen({ route }) {
     (async () => {
       const log = await getLog(date);
       if (!active) return;
+      setHasLog(!!log);
       setFlow(log?.flow || 'None');
       setMoods(split(log?.mood));
       setSymptoms(split(log?.symptoms));
@@ -67,7 +69,26 @@ export default function DailyLogScreen({ route }) {
       symptoms: symptoms.join(','),
       note: note.trim(),
     });
+    setHasLog(true);
     Alert.alert('Saved', `Your log for ${formatDate(date)} is saved.`);
+  };
+
+  const handleDelete = () => {
+    Alert.alert('Delete this log?', `Your log for ${formatDate(date)} will be removed.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteLog(date);
+          setFlow('None');
+          setMoods([]);
+          setSymptoms([]);
+          setNote('');
+          setHasLog(false);
+        },
+      },
+    ]);
   };
 
   const isToday = date === today();
@@ -130,6 +151,7 @@ export default function DailyLogScreen({ route }) {
         </Card>
 
         <Button title="Save log" onPress={handleSave} />
+        {hasLog && <Button title="Delete log" variant="danger" onPress={handleDelete} />}
       </ScrollView>
     </KeyboardAvoidingView>
   );
